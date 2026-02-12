@@ -1,0 +1,72 @@
+[
+    {
+        "word": "LA",
+        "start": 0.0,
+        "end": 0.38
+    },
+    {
+        "word": "INTELIGENCIA",
+        "start": 0.38,
+        "end": 0.98
+    },
+    {
+        "word": "ARTIFICIAL",
+        "start": 0.98,
+        "end": 1.54
+    },
+    {
+        "word": "ESTÁ",
+        "start": 1.54,
+        "end": 1.82
+    },
+    {
+        "word": "TRANSFORMANDO",
+        "start": 1.82,
+        "end": 2.48
+    },
+    {
+        "word": "LA",
+        "start": 2.48,
+        "end": 2.6
+    },
+    {
+        "word": "FORMA",
+        "start": 2.6,
+        "end": 2.86
+    },
+    {
+        "word": "EN",
+        "start": 2.86,
+        "end": 3.02
+    },
+    {
+        "word": "QUE",
+        "start": 3.02,
+        "end": 3.12
+    },
+    {
+        "word": "PROGRAMAMOS",
+        "start": 3.12,
+        "end": 3.62
+    },
+    {
+        "word": "SOFTWARE",
+        "start": 3.62,
+        "end": 4.02
+    },
+    {
+        "word": "HOY",
+        "start": 4.02,
+        "end": 4.24
+    },
+    {
+        "word": "EN",
+        "start": 4.24,
+        "end": 4.34
+    },
+    {
+        "word": "DÍA.",
+        "start": 4.34,
+        "end": 4.56
+    }
+]
