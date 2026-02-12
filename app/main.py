@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from core_io import load_config
+from engine.core_io import load_config
 
 app = FastAPI()
 cfg = load_config()
