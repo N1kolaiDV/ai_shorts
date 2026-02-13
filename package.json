@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "@heroui/react": "^2.8.8",
+    "axios": "^1.13.5",
+    "framer-motion": "^12.34.0",
+    "lucide-react": "^0.563.0"
+  }
+}

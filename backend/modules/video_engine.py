@@ -1,76 +1,111 @@
 import os
-import json
-import PIL.Image
-# Parche de compatibilidad Pillow
-if not hasattr(PIL.Image, 'ANTIALIAS'):
-    PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
+import random
+import sys
+from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, AudioFileClip, vfx
+from proglog import ProgressBarLogger
 
-from moviepy.editor import VideoFileClip, TextClip, CompositeVideoClip, AudioFileClip
+class ProgressoLogger(ProgressBarLogger):
+    def __init__(self, update_func):
+        super().__init__()
+        self.update_func = update_func
 
-# Configuracion de ImageMagick
-os.environ["IMAGEMAGICK_BINARY"] = r"C:\Program Files\ImageMagick-6.9.13-Q16-HDRI\convert.exe"
+    def callback(self, **kwargs):
+        if self.state.get('bars'):
+            bar_name = list(self.state['bars'].keys())[-1]
+            bar = self.state['bars'][bar_name]
+            index = bar['index']
+            total = bar['total']
+            if total > 0:
+                percent_render = int((index / total) * 45)
+                final_percent = 50 + percent_render
+                if self.update_func:
+                    self.update_func(final_percent)
+                percent_raw = int((index / total) * 100)
+                sys.stdout.write(f"\r[MOVIEPY] {bar_name}: {index}/{total} frames ({percent_raw}%) ")
+                sys.stdout.flush()
 
 class VideoEngine:
-    def __init__(self, audio_path, timestamps_path, clips_dir):
-        self.audio_path = audio_path
-        self.clips_dir = clips_dir
-        with open(timestamps_path, 'r', encoding='utf-8') as f:
-            self.word_timestamps = json.load(f)
+    def __init__(self, output_path="assets/output/temp_video.mp4"):
+        self.output_path = output_path
+        self.width, self.height = 1080, 1920
 
-    def create_subtitle_clip(self, word_data):
-        duration = word_data['end'] - word_data['start']
-        if duration <= 0: duration = 0.1
+    def assemble_video(self, clip_paths, audio_path, timestamps, progress_callback=None):
+        audio = AudioFileClip(audio_path)
+        video_clips = []
+        num_clips = len(clip_paths)
+        words_per_clip = max(1, len(timestamps) // num_clips)
+        crossfade_dur = 0.3 
+
+        for i in range(num_clips):
+            path = clip_paths[i]
+            idx_start = i * words_per_clip
+            start_t = timestamps[idx_start]['start']
+            
+            if i == num_clips - 1:
+                end_t = audio.duration
+            else:
+                next_idx = min((i + 1) * words_per_clip, len(timestamps)-1)
+                end_t = timestamps[next_idx]['start']
+            
+            dur = end_t - start_t
+            
+            try:
+                # OPTIMIZACIÓN: target_resolution redimensiona vía FFmpeg al leer.
+                clip = VideoFileClip(path, audio=False, target_resolution=(self.height, None))
+                
+                if clip.duration < dur:
+                    clip = clip.fx(vfx.loop, duration=dur)
+                else:
+                    clip = clip.subclip(0, dur)
+
+                if clip.w > self.width:
+                    clip = clip.crop(x_center=clip.w/2, width=self.width)
+                
+                clip = clip.set_start(start_t).set_duration(dur).crossfadein(crossfade_dur)
+                video_clips.append(clip)
+            except Exception as e: 
+                print(f"Error cargando clip {path}: {e}")
+                continue
+
+        background = CompositeVideoClip(video_clips, size=(self.width, self.height)).set_audio(audio)
         
-        return (TextClip(word_data['word'], 
-                         fontsize=110, 
-                         color='yellow', 
-                         font='Arial-Bold', 
-                         stroke_color='black', 
-                         stroke_width=2,
-                         method='caption',
-                         size=(900, None))
-                .set_start(word_data['start'])
-                .set_duration(duration)
-                .set_position(('center', 1400))) # Un poco más abajo del centro
+        sub_clips = []
+        for t in timestamps:
+            duration = t['end'] - t['start']
+            if duration <= 0: continue
+            
+            txt = TextClip(
+                t['word'].upper(), fontsize=150, color='#FFFF00',
+                font='Arial-Bold', stroke_color='black', stroke_width=4, method='label'
+            ).set_start(t['start']).set_end(t['end'])
+            
+            txt = txt.set_position(('center', self.height * 0.70)).rotate(random.uniform(-2, 2))
+            sub_clips.append(txt)
 
-    def assemble_video(self, output_path):
-        # 1. Cargar Audio
-        audio = AudioFileClip(self.audio_path)
-        video_duration = audio.duration
-        print(f"Duración del audio detectada: {video_duration}s")
+        final_video = CompositeVideoClip([background] + sub_clips, size=(self.width, self.height))
         
-        # 2. Cargar y Procesar Clips de Fondo
-        clips_files = [os.path.join(self.clips_dir, f) for f in os.listdir(self.clips_dir) if f.endswith('.mp4')]
-        if not clips_files:
-            raise Exception("No hay clips para procesar.")
+        my_logger = ProgressoLogger(progress_callback)
 
-        processed_clips = []
-        duration_per_clip = video_duration / len(clips_files)
-        
-        for i, file in enumerate(clips_files):
-            clip = (VideoFileClip(file)
-                    .without_audio() # Quitamos audio original del stock
-                    .resize(height=1920)
-                    .crop(x_center=540, y_center=960, width=1080, height=1920)
-                    .set_duration(duration_per_clip)
-                    .set_start(i * duration_per_clip))
-            processed_clips.append(clip)
-
-        # 3. Crear Subtítulos
-        subtitle_clips = [self.create_subtitle_clip(w) for w in self.word_timestamps]
-
-        # 4. Composición Final (Aquí estaba el error de la variable)
-        # Unimos fondos y luego subtítulos encima
-        final_video = CompositeVideoClip(processed_clips + subtitle_clips, size=(1080, 1920))
-        final_video = final_video.set_audio(audio).set_duration(video_duration)
-
-        # 5. Renderizado con parámetros de audio forzados
-        print("Renderizando video final con audio...")
+        # CONFIGURACIÓN CORREGIDA: Eliminamos los flags que causan error
         final_video.write_videofile(
-            output_path, 
+            self.output_path, 
             fps=24, 
-            codec="libx264", 
-            audio_codec="libmp3lame", 
-            threads=4,                
-            logger="bar"
+            codec="h264_nvenc", 
+            audio_codec="aac",
+            threads=os.cpu_count(), 
+            preset="p1", 
+            bitrate="4000k",
+            ffmpeg_params=[
+                "-pix_fmt", "yuv420p", # <--- CRÍTICO: Compatibilidad de video
+                "-rc", "vbr",          # Bitrate variable (velocidad)
+                "-cq", "28"            # Calidad constante
+            ],
+            logger=my_logger
         )
+        
+        print("\n[OK] Renderizado finalizado con éxito.")
+        
+        audio.close()
+        background.close()
+        for c in video_clips: c.close()
+        return self.output_path
