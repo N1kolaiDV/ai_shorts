@@ -21,17 +21,13 @@ echo [+] Iniciando Backend Python...
 call ".\.venv\Scripts\activate.bat"
 start "Backend" cmd /k "cd backend && python main.py"
 
-REM ---- 3. Iniciar Frontend (Vite) ----
-echo [+] Iniciando Frontend Vite...
-start "Frontend" cmd /k "cd frontend && npm run dev"
-
 REM ---- Esperar a que los servicios carguen ----
 timeout /t 5 >nul
 
 REM ---- 4. Abrir Firefox con pestañas para todo ----
 echo [+] Abriendo Firefox...
 REM Abre el Frontend y el Editor de n8n en pestañas separadas
-start "" "firefox.exe" -new-tab "http://localhost:5173" -new-tab "http://localhost:5678"
+start "" "firefox.exe" -new-tab "http://localhost:5678"
 
 echo ========================================
 echo  Todo listo. Revisa las terminales si hay errores.
