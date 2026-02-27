@@ -1,56 +1,73 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 
-export const PreviewPlayer = ({ activeClipUrl, activeWord, audioRef, audioUrl, onTimeUpdate }) => {
-  
-  // Sincronizar el video con el estado de reproducción del audio
+export const PreviewPlayer = ({ activeClipUrl, activeWord, audioRef, audioUrl, onTimeUpdate, isFinal, currentTime }) => {
+  const videoRef = useRef(null);
+
   useEffect(() => {
-    const videoElement = document.getElementById("preview-video");
-    if (videoElement && audioRef.current) {
+    const videoEl = videoRef.current;
+    if (isFinal && videoEl) {
+      videoEl.muted = false;
+      return;
+    }
+    if (!isFinal && videoEl && audioRef?.current) {
       if (!audioRef.current.paused) {
-        videoElement.play().catch(() => {});
+        videoEl.play().catch(() => {});
       } else {
-        videoElement.pause();
+        videoEl.pause();
       }
     }
-  }, [activeClipUrl]);
+  }, [activeClipUrl, isFinal, audioRef]);
 
   return (
-    <div className="relative w-full h-full flex items-center justify-center bg-black group">
-      {/* VIDEO DE FONDO (CLIP DE PEXELS) */}
+    <div className="relative w-full h-full flex items-center justify-center bg-zinc-950 rounded-[2rem] overflow-hidden border-8 border-zinc-900 shadow-2xl">
       {activeClipUrl ? (
         <video
-          id="preview-video"
+          ref={videoRef}
           src={activeClipUrl}
           className="w-full h-full object-cover"
           autoPlay
-          muted
-          loop
+          muted={!isFinal}
+          controls={isFinal}
+          loop={!isFinal}
           playsInline
-          key={activeClipUrl} // Fuerza recarga al cambiar de clip
+          key={activeClipUrl}
         />
       ) : (
-        <div className="text-zinc-700 text-xs font-bold uppercase tracking-widest">
-          Esperando análisis...
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-4 border-zinc-800 border-t-red-600 animate-spin" />
+          <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Sincronizando...</span>
         </div>
       )}
 
-      {/* OVERLAY DE SUBTÍTULOS */}
-      <div className="absolute inset-0 flex items-center justify-center p-10 pointer-events-none">
-        {activeWord && (
-          <span className="text-white text-4xl font-black uppercase italic tracking-tighter drop-shadow-[0_4px_10px_rgba(0,0,0,1)] bg-yellow-500 px-4 py-1 rounded-sm">
-            {activeWord.word}
-          </span>
-        )}
-      </div>
+      {/* SUBTÍTULOS DINÁMICOS POR FRASE */}
+      {!isFinal && activeWord && activeWord.words && (
+        <div className="absolute inset-x-0 bottom-[18%] flex flex-wrap justify-center gap-x-2 gap-y-1 px-6 pointer-events-none z-50">
+          {activeWord.words.map((w, i) => {
+            const isHighlighted = currentTime >= w.start && currentTime <= w.end;
+            
+            return (
+              <span
+                key={i}
+                className={`text-2xl font-black uppercase italic transition-all duration-75 ${
+                  isHighlighted 
+                    ? "text-yellow-400 scale-125 drop-shadow-[0_0_10px_rgba(234,179,8,0.8)] z-10" 
+                    : "text-white drop-shadow-[2px_2px_0px_rgba(0,0,0,1)]"
+                }`}
+                style={{ 
+                   WebkitTextStroke: isHighlighted ? "1px rgba(0,0,0,0.5)" : "none",
+                   display: "inline-block"
+                }}
+              >
+                {w.word}
+              </span>
+            );
+          })}
+        </div>
+      )}
 
-      {/* AUDIO OCULTO QUE MANDA EL TIEMPO */}
-      <audio
-        ref={audioRef}
-        src={audioUrl}
-        onTimeUpdate={onTimeUpdate}
-        className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[80%] opacity-20 hover:opacity-100 transition-opacity"
-        controls
-      />
+      {!isFinal && (
+        <audio key={audioUrl} ref={audioRef} src={audioUrl} onTimeUpdate={onTimeUpdate} className="hidden" />
+      )}
     </div>
   );
 };
